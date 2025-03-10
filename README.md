@@ -22,6 +22,7 @@ Python 脚本快速构建 NPU 推理脚本
 *需要注意的是，如果您的开发环境是算力卡，那么更建议您优先考虑使用 [pyAXCL](https://github.com/AXERA-TECH/pyaxcl) 进行项目开发；pyAXCL 项目完整包含了算力卡形态的全部 API，更适合用于正式部署；PyAXEngine 项目更适合算法工程师进行快速原型验证，且用于计算卡环境时，PyAXEngine 不能调用编解码等模块(不是 PyAXEngine 的设计目标)。*
 
 *AX650 SDK 2.18，AX620E SDK 3.12 以前的版本不支持 bf16，llm 模型会有返回 unknown 的 dtype问题，请注意升级*
+
 *如果您评估认为不知道如何升级 SDK，也可以提交 issue 索要下载，不需要更新完整 SDK，只更新 libax_engine.so 即可*
 
 ## 快速上手
