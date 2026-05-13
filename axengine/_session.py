@@ -90,8 +90,22 @@ class InferenceSession:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        # Forward to backend close() if it has one (RemoteAXSession does).
+        close = getattr(self._sess, "close", None)
+        if callable(close):
+            try:
+                close()
+            except Exception:
+                pass
         # not suppress exceptions
         return False
+
+    def close(self):
+        """Closes any backend resources (for RemoteAXSession this sends BYE and
+        closes the TCP socket). Other backends keep the legacy no-op behavior."""
+        close = getattr(self._sess, "close", None)
+        if callable(close):
+            close()
 
     def get_session_options(self):
         """
