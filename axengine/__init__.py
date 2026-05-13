@@ -8,7 +8,7 @@
 # thanks to community contributors list below:
 #   zylo117: https://github.com/zylo117, first implementation of the axclrt backend
 
-from ._providers import axengine_provider_name, axclrt_provider_name
+from ._providers import axengine_provider_name, axclrt_provider_name, remote_provider_name
 from ._providers import get_all_providers, get_available_providers
 
 # check if axclrt is installed, or is a supported chip(e.g. AX650, AX620E etc.)
@@ -20,3 +20,4 @@ print("[INFO] Available providers: ", _available_providers)
 
 from ._node import NodeArg
 from ._session import SessionOptions, InferenceSession
+from ._discovery import discover_devices, DeviceInfo

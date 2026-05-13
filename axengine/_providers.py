@@ -11,6 +11,7 @@ import os
 providers = []
 axengine_provider_name = 'AxEngineExecutionProvider'
 axclrt_provider_name = 'AXCLRTExecutionProvider'
+remote_provider_name = 'RemoteAXExecutionProvider'
 
 _axengine_lib_name = 'ax_engine'
 _axclrt_lib_name = 'axcl_rt'
@@ -32,9 +33,14 @@ elif _has_axclrt_lib:
 elif _has_axengine_lib:
     providers = [axengine_provider_name]
 
+# RemoteAXExecutionProvider is always available — it's a pure Python TCP client
+# and does not require any local AX library. It's appended last so the local
+# providers stay the default when the host has them.
+providers.append(remote_provider_name)
+
 
 def get_all_providers():
-    return [axengine_provider_name, axclrt_provider_name]
+    return [axengine_provider_name, axclrt_provider_name, remote_provider_name]
 
 
 def get_available_providers():

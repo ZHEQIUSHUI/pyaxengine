@@ -12,7 +12,7 @@ import numpy as np
 
 from ._base_session import SessionOptions
 from ._node import NodeArg
-from ._providers import axclrt_provider_name, axengine_provider_name
+from ._providers import axclrt_provider_name, axengine_provider_name, remote_provider_name
 from ._providers import get_available_providers
 
 
@@ -79,6 +79,9 @@ class InferenceSession:
         if self._provider == axengine_provider_name:
             from ._axe import AXEngineSession
             self._sess = AXEngineSession(path_or_bytes, sess_options, provider_options, **kwargs)
+        if self._provider == remote_provider_name:
+            from ._remote import RemoteAXSession
+            self._sess = RemoteAXSession(path_or_bytes, sess_options, self._provider_options, **kwargs)
         if self._sess is None:
             raise RuntimeError(f"Create session failed with provider: {self._provider}")
 
