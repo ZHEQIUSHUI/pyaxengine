@@ -107,6 +107,23 @@ class InferenceSession:
         if callable(close):
             close()
 
+    @property
+    def last_timing(self) -> dict:
+        """For RemoteAXExecutionProvider sessions, returns a dict with the
+        per-run timing breakdown of the most recent run():
+
+            input_ms     — wall-clock to send inputs (client -> device)
+            device_ms    — NPU inference time as measured on the device by
+                           the SDK (the only number that reflects pure compute)
+            output_ms    — derived: server post-inference handling + device->client
+                           transfer + client recv into Python
+            total_ms     — send_start -> recv_done, end-to-end wire round-trip
+            input_bytes  / output_bytes — raw on-the-wire sizes
+
+        Other providers return an empty dict.
+        """
+        return getattr(self._sess, "last_timing", {}) or {}
+
     def get_session_options(self):
         """
         Return the session options. See :class:`axengine.SessionOptions`.

@@ -84,6 +84,20 @@ class RemoteAXSession(Session):
         self._chip_type = ""
         self._engine_version = ""
 
+        # last_timing is filled in by every run(). Fields:
+        #   input_ms      : wall-clock to send the input tensors (client -> device)
+        #   device_ms     : NPU inference time as reported by the device SDK
+        #   output_ms     : derived: (recv_done - send_done) - device_ms; covers
+        #                   server-side post-NPU bookkeeping + dev->client transfer
+        #                   + client-side recv into Python
+        #   total_ms      : send_start -> recv_done (does NOT include the
+        #                   numpy.reshape/copy on the client; that's outside the
+        #                   wire)
+        #   input_bytes   : sum of input tensor sizes
+        #   output_bytes  : sum of output tensor sizes (raw, on the wire)
+        # See the README "timings" section for what each number includes.
+        self.last_timing: dict = {}
+
         self._connect()
         self._hello()
         model_bytes = _load_bytes(path_or_bytes)
@@ -228,18 +242,28 @@ class RemoteAXSession(Session):
         else:
             ordered = [name_to_arr[n] for n in output_names]
 
+        in_ms = (t_send1 - t_send0) * 1000.0
+        dev_ms = dev_us / 1000.0
+        # Anything between t_send1 and t_recv that isn't device inference is
+        # output transfer plus client recv overhead.
+        out_ms = max(0.0, (t_recv - t_send1) * 1000.0 - dev_ms)
+        total_ms = (t_recv - t_send0) * 1000.0
+
+        self.last_timing = {
+            "input_ms":   in_ms,
+            "device_ms":  dev_ms,
+            "output_ms":  out_ms,
+            "total_ms":   total_ms,
+            "input_bytes":  int(in_bytes),
+            "output_bytes": int(out_bytes),
+        }
+
         if self._verbose:
-            in_ms = (t_send1 - t_send0) * 1000.0
-            dev_ms = dev_us / 1000.0
-            # Anything between t_send1 and t_recv that isn't device inference is
-            # output transfer plus client recv overhead.
-            out_ms = max(0.0, (t_recv - t_send1) * 1000.0 - dev_ms)
-            total_ms = (t_recv - t_send0) * 1000.0
             print(
                 f"[REMOTE {self._endpoint[0]}:{self._endpoint[1]}] "
-                f"in: {in_ms:6.2f} ms ({in_bytes/1e6:5.2f} MB)  "
-                f"device: {dev_ms:6.2f} ms  "
-                f"out: {out_ms:6.2f} ms ({out_bytes/1e6:5.2f} MB)  "
+                f"input(c->d): {in_ms:6.2f} ms ({in_bytes/1e6:5.2f} MB)  "
+                f"device(NPU): {dev_ms:6.2f} ms  "
+                f"output(d->c): {out_ms:6.2f} ms ({out_bytes/1e6:5.2f} MB)  "
                 f"total: {total_ms:6.2f} ms")
 
         return ordered
