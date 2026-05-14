@@ -20,17 +20,120 @@ from ._base_session import Session, SessionOptions
 from ._node import NodeArg
 
 
+# Convenience chip-type aliases. Each maps a short name to a (chip_type_pattern,
+# backend_pattern) pair used to filter discover_devices() output.
+#   - chip_type_pattern: a Python str.upper() substring (None = any)
+#   - backend_pattern:   exact backend string (None = any)
+#   - reject_pattern:    chip_type substrings that must NOT match (handles the
+#                        "AX620Q vs AX620QP" overlap, since 'AX620Q' is a
+#                        substring of 'AX620QP_CHIP')
+_CHIP_ALIASES = {
+    "AX650":   ("AX650",   None,             ()),
+    "AX650N":  ("AX650",   None,             ()),
+    "AX630C":  ("AX630C",  None,             ()),
+    "AX620Q":  ("AX620Q",  None,             ("AX620QP",)),
+    "AX620QP": ("AX620QP", None,             ()),
+    "AXCL":    (None,      "AXCLRTExecutionProvider", ()),
+}
+
+
+def _device_matches(dev, chip_query, backend_query) -> bool:
+    """Filter a DeviceInfo against optional chip / backend filters.
+
+    `chip_query` may be one of the keys in `_CHIP_ALIASES` (case-insensitive)
+    or a free-form substring that's matched against `dev.chip_type`.
+    """
+    if chip_query:
+        q = str(chip_query).upper()
+        alias = _CHIP_ALIASES.get(q)
+        if alias is not None:
+            chip_pat, backend_pat, reject = alias
+        else:
+            chip_pat, backend_pat, reject = q, None, ()
+        ct = (dev.chip_type or "").upper()
+        bk = dev.backend or ""
+        if chip_pat and chip_pat not in ct:
+            return False
+        if backend_pat and backend_pat != bk:
+            return False
+        for r in reject:
+            if r in ct:
+                return False
+    if backend_query and backend_query != dev.backend:
+        return False
+    return True
+
+
 def _resolve_endpoint(provider_options: Optional[dict]) -> tuple[str, int]:
-    if not provider_options:
-        raise ValueError(
-            "RemoteAXExecutionProvider requires provider_options with at least "
-            "'host' set, e.g. providers=[('RemoteAXExecutionProvider', "
-            "{'host':'192.168.1.42','port':18500})]")
-    host = provider_options.get("host") or provider_options.get("ip")
-    if not host:
-        raise ValueError("provider_options must include 'host' (device IP)")
-    port = int(provider_options.get("port", 18500))
-    return str(host), port
+    """Resolve the (host, port) to dial.
+
+    Three shapes are supported:
+
+      1. Explicit host:
+            {"host": "192.168.1.42"}            -> use it as-is
+            {"host": "192.168.1.42", "port": 18500}
+
+      2. No host, chip filter only — auto-discover, pick first match:
+            {}                                  -> any device on the LAN
+            {"chip": "AX650N"}                  -> first AX650N device
+            {"chip": "ax620q"}                  -> AX620Q (excludes AX620QP)
+            {"chip": "axcl"}                    -> any AXCL host
+            {"backend": "AxEngineExecutionProvider"}
+
+      3. None at all (e.g. providers=["RemoteAXExecutionProvider"])
+         is treated like {} — any device on the LAN.
+
+    Auto-discovery uses `discover_devices()`. Tune via:
+        discovery_timeout : seconds to listen (default 3.0)
+        broadcast_port    : UDP broadcast port (default 9988)
+        discovery_methods : iterable of {"udp","mdns"} (default ("udp",))
+    """
+    opts = provider_options or {}
+    host = opts.get("host") or opts.get("ip")
+    port = int(opts.get("port", 18500))
+    if host:
+        return str(host), port
+
+    # Auto-discover.
+    from ._discovery import discover_devices
+    timeout = float(opts.get("discovery_timeout", 3.0))
+    bcast_port = int(opts.get("broadcast_port", 9988))
+    methods = tuple(opts.get("discovery_methods", ("udp",)))
+    chip_q = opts.get("chip") or opts.get("chip_type")
+    backend_q = opts.get("backend")
+
+    devs = discover_devices(timeout=timeout, methods=methods, broadcast_port=bcast_port)
+    matches = [d for d in devs if _device_matches(d, chip_q, backend_q)]
+
+    if not matches:
+        if not devs:
+            raise RuntimeError(
+                "RemoteAXExecutionProvider: no devices discovered on the LAN "
+                f"(listened {timeout:.1f}s on UDP {bcast_port}). "
+                "Pass provider_options={'host': '<ip>'} to skip discovery, "
+                "or check that a daemon is broadcasting (`ax_remote_infer` "
+                "running and not on a different L2 segment).")
+        seen = [f"{d.ip} chip={d.chip_type or '?'} backend={d.backend}" for d in devs]
+        filt = []
+        if chip_q:    filt.append(f"chip={chip_q!r}")
+        if backend_q: filt.append(f"backend={backend_q!r}")
+        raise RuntimeError(
+            "RemoteAXExecutionProvider: discovered devices, but none matched "
+            f"filter ({', '.join(filt)}). Seen: " + "; ".join(seen))
+
+    pick = matches[0]
+    pretty_filter = ""
+    if chip_q:    pretty_filter += f" chip={chip_q!r}"
+    if backend_q: pretty_filter += f" backend={backend_q!r}"
+    if len(matches) > 1:
+        others = ", ".join(f"{d.ip}({d.chip_type})" for d in matches[1:])
+        print(f"[REMOTE] auto-discovery{pretty_filter} -> "
+              f"{pick.ip}:{pick.tcp_port} chip={pick.chip_type} "
+              f"(also: {others})", flush=True)
+    else:
+        print(f"[REMOTE] auto-discovery{pretty_filter} -> "
+              f"{pick.ip}:{pick.tcp_port} chip={pick.chip_type}", flush=True)
+    return pick.ip, pick.tcp_port
 
 
 def _provider_code(name: Optional[str]) -> int:

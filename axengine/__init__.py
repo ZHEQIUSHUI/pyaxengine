@@ -21,3 +21,18 @@ print("[INFO] Available providers: ", _available_providers)
 from ._node import NodeArg
 from ._session import SessionOptions, InferenceSession
 from ._discovery import discover_devices, DeviceInfo
+
+
+class Chip:
+    """Chip filter constants for the RemoteAXExecutionProvider auto-discovery
+    path. Use as ``provider_options={"chip": axe.Chip.AX650N}``.
+
+    ``AXCL`` matches any AXCL-host card regardless of architecture (x86_64,
+    aarch64, riscv64). ``AX620Q`` strictly excludes AX620QP (and vice-versa),
+    even though ``AX620Q`` is a substring of ``AX620QP_CHIP``.
+    """
+    AX650N  = "AX650N"
+    AX630C  = "AX630C"
+    AX620Q  = "AX620Q"
+    AX620QP = "AX620QP"
+    AXCL    = "AXCL"
