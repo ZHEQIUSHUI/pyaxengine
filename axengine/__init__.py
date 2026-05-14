@@ -33,6 +33,8 @@ class Chip:
     """
     AX650N  = "AX650N"
     AX630C  = "AX630C"
+    AX637   = "AX637"
     AX620Q  = "AX620Q"
     AX620QP = "AX620QP"
+    AX615   = "AX615"
     AXCL    = "AXCL"

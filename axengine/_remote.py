@@ -31,8 +31,10 @@ _CHIP_ALIASES = {
     "AX650":   ("AX650",   None,             ()),
     "AX650N":  ("AX650",   None,             ()),
     "AX630C":  ("AX630C",  None,             ()),
+    "AX637":   ("AX637",   None,             ()),
     "AX620Q":  ("AX620Q",  None,             ("AX620QP",)),
     "AX620QP": ("AX620QP", None,             ()),
+    "AX615":   ("AX615",   None,             ()),
     "AXCL":    (None,      "AXCLRTExecutionProvider", ()),
 }
 
